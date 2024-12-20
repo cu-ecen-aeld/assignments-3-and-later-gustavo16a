@@ -1,4 +1,10 @@
 #include "systemcalls.h"
+#include <stdlib.h>
+#include <sys/wait.h>
+#include <unistd.h>
+#include <sys/types.h>
+#include <sys/stat.h>
+#include <fcntl.h>
 
 /**
  * @param cmd the command to execute with system()
@@ -15,9 +21,11 @@ bool do_system(const char *cmd)
  *  Call the system() function with the command set in the cmd
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
-*/
-
-    return true;
+*/  
+    if (system(cmd) == 0) {
+        return true;
+    }
+    return false;
 }
 
 /**
@@ -47,7 +55,7 @@ bool do_exec(int count, ...)
     command[count] = NULL;
     // this line is to avoid a compile warning before your implementation is complete
     // and may be removed
-    command[count] = command[count];
+    // command[count] = command[count];
 
 /*
  * TODO:
@@ -58,10 +66,26 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
+    pid_t pid;
+    int exec_pid;
+    int status;
+    pid = fork();
+   
+
+    switch (pid) {
+        case -1://error to fork
+            return false;
+        
+        case 0://child
+            exec_pid = execv(command[0], command);
+            exit(exec_pid);//always exit
+        
+        default://parent
+            wait(&status);
+    }
 
     va_end(args);
-
-    return true;
+    return status == 0;
 }
 
 /**
@@ -93,7 +117,34 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *
 */
 
-    va_end(args);
+    pid_t pid;
+    int exec_pid;
+    int status;
+    
+    int fd = open(outputfile, O_WRONLY|O_TRUNC|O_CREAT, 0644);
+    if (fd < 0) { 
+        return false; 
+    }
+    
+    pid = fork();
+    switch (pid) {
+        case -1://error to fork
+            return false;
+        
+        case 0://child
 
-    return true;
+            if (dup2(fd, 1) < 0) { 
+                exit(-1);
+            }
+            close(fd);
+            exec_pid = execv(command[0], command);
+            exit(exec_pid);//always exit inside child
+        
+        default://parent
+            close(fd);
+            wait(&status);
+    }
+
+    va_end(args);
+    return status == 0;
 }
